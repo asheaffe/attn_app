@@ -1,18 +1,24 @@
 """
-SAT Practice + floating YouTube player
+SAT Reading Practice + YouTube player
 
 Install:   pip install PyQt6 PyQt6-WebEngine
 Run:       python sat_app.py
 
-- Main window: SAT-style multiple-choice practice (Math + Reading & Writing),
-  plus much easier 'Easy Math' and 'Easy Reading & Writing' warm-up sections.
+- Main window: SAT-style multiple-choice READING practice (passage questions and
+  vocabulary in context) at three difficulty levels.
 - A small YouTube player is embedded in the bottom-right corner of the main window.
   Paste any YouTube link (video, youtu.be, shorts, or playlist) and press Play.
+- The video follows the difficulty of the question on screen:
+    Easy          -> video plays normally
+    Intermediate  -> picture hidden, audio keeps playing at a lower volume
+    Hard          -> video paused completely
+- Hard questions never appear in the first half of a session.
 - File > Load questions (JSON)... lets you add your own questions.
   Format: a list of objects like
-    {"section": "Math", "passage": "(optional)", "prompt": "...",
+    {"section": "Reading Comprehension", "level": "easy", "passage": "(optional)", "prompt": "...",
      "choices": ["a", "b", "c", "d"], "answer": 0, "explanation": "..."}
-  where "answer" is the 0-based index of the correct choice.
+  where "answer" is the 0-based index of the correct choice, and "level" is
+  "easy", "intermediate" or "hard" (optional, defaults to "intermediate").
 """
 
 import json
@@ -34,64 +40,128 @@ from PyQt6.QtWidgets import (
 # Question bank (original practice questions)
 # --------------------------------------------------------------------------
 QUESTIONS = [
-    # ---- Math ----
-    {"section": "Math",
-     "prompt": "If 3x + 7 = 25, what is the value of 6x + 5?",
-     "choices": ["31", "36", "41", "47"], "answer": 2,
-     "explanation": "3x = 18, so 6x = 36 and 6x + 5 = 41."},
-    {"section": "Math",
-     "prompt": "A line passes through the points (2, 5) and (6, 13). What is the y-intercept of the line?",
-     "choices": ["0", "1", "2", "3"], "answer": 1,
-     "explanation": "Slope = (13 - 5)/(6 - 2) = 2. Using (2, 5): 5 = 2(2) + b, so b = 1."},
-    {"section": "Math",
-     "prompt": "What is the sum of the solutions to x² − 5x − 14 = 0?",
-     "choices": ["−7", "−5", "5", "14"], "answer": 2,
-     "explanation": "Factor: (x − 7)(x + 2) = 0, so x = 7 or x = −2. The sum is 5 (also −b/a = 5)."},
-    {"section": "Math",
-     "prompt": "Notebooks cost $4 each and pens cost $1.50 each. Maria buys 5 notebooks and some pens "
-               "for a total of $29. How many pens did she buy?",
-     "choices": ["4", "5", "6", "8"], "answer": 2,
-     "explanation": "5 notebooks cost $20, leaving $9. $9 ÷ $1.50 = 6 pens."},
-    {"section": "Math",
-     "prompt": "After a 20% increase, the price of a jacket is $90. What was the original price?",
-     "choices": ["$70", "$72", "$75", "$78"], "answer": 2,
-     "explanation": "Original × 1.20 = 90, so the original price is 90 ÷ 1.2 = $75."},
-    {"section": "Math",
-     "prompt": "A circle has an area of 49π. What is its circumference?",
-     "choices": ["7π", "14π", "49π", "98π"], "answer": 1,
-     "explanation": "πr² = 49π gives r = 7, so the circumference is 2πr = 14π."},
-    {"section": "Math",
-     "prompt": "The mean of five numbers is 12. Four of the numbers are 8, 10, 14, and 15. What is the fifth number?",
-     "choices": ["11", "12", "13", "15"], "answer": 2,
-     "explanation": "The total must be 5 × 12 = 60. The four known numbers sum to 47, so the fifth is 13."},
+    # ======================= EASY (very simple) =======================
+    {"section": "Vocabulary in Context", "level": "easy",
+     "prompt": "Which word means the same as 'big'?",
+     "choices": ["large", "small", "red", "fast"], "answer": 0,
+     "explanation": "'Big' and 'large' both mean great in size."},
+    {"section": "Vocabulary in Context", "level": "easy",
+     "prompt": "Which word means the opposite of 'hot'?",
+     "choices": ["cold", "warm", "sunny", "dry"], "answer": 0,
+     "explanation": "'Cold' is the opposite of 'hot'."},
+    {"section": "Vocabulary in Context", "level": "easy",
+     "prompt": "Which word best completes the sentence?\n\nThe dog wagged its ______ when it saw its owner.",
+     "choices": ["tail", "wing", "fin", "horn"], "answer": 0,
+     "explanation": "Dogs wag their tails when they are happy."},
+    {"section": "Vocabulary in Context", "level": "easy",
+     "prompt": "Which word means the same as 'happy'?",
+     "choices": ["glad", "angry", "tired", "hungry"], "answer": 0,
+     "explanation": "'Glad' means feeling pleased or happy."},
+    {"section": "Reading Comprehension", "level": "easy",
+     "passage": "Sam has a red ball. He kicks it across the yard.",
+     "prompt": "What color is Sam's ball?",
+     "choices": ["red", "blue", "green", "yellow"], "answer": 0,
+     "explanation": "The text says Sam has a red ball."},
+    {"section": "Reading Comprehension", "level": "easy",
+     "passage": "Lila woke up early on Saturday. She put on her boots and went outside to feed the chickens.",
+     "prompt": "What did Lila do after she put on her boots?",
+     "choices": ["She went back to bed.", "She went outside to feed the chickens.",
+                 "She ate breakfast.", "She rode her bike."], "answer": 1,
+     "explanation": "The text says she put on her boots and went outside to feed the chickens."},
+    {"section": "Reading Comprehension", "level": "easy",
+     "passage": "Penguins are birds that cannot fly. They use their wings to swim.",
+     "prompt": "What do penguins use their wings for?",
+     "choices": ["flying", "swimming", "digging", "climbing"], "answer": 1,
+     "explanation": "The text says penguins use their wings to swim."},
+    {"section": "Reading Comprehension", "level": "easy",
+     "passage": "It was a cold winter day. Tom wore his hat, gloves, and a warm coat.",
+     "prompt": "Why did Tom wear a warm coat?",
+     "choices": ["Because it was hot", "Because it was cold",
+                 "Because he was going swimming", "Because it was his birthday"], "answer": 1,
+     "explanation": "The text says it was a cold winter day."},
 
-    # ---- Reading & Writing ----
-    {"section": "Reading & Writing",
-     "prompt": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\n"
-               "The committee, along with several outside advisors, ______ expected to announce its decision on Friday.",
-     "choices": ["are", "is", "were", "have been"], "answer": 1,
-     "explanation": "The subject is 'The committee' (singular). 'Along with several outside advisors' is "
-                    "parenthetical and doesn't change the number, so the verb is 'is'."},
-    {"section": "Reading & Writing",
+    # ================= INTERMEDIATE (simple, a little more reading) =================
+    {"section": "Vocabulary in Context", "level": "intermediate",
+     "prompt": "Which word is closest in meaning to 'enormous'?",
+     "choices": ["tiny", "huge", "quiet", "quick"], "answer": 1,
+     "explanation": "'Enormous' means very large, which is 'huge'."},
+    {"section": "Vocabulary in Context", "level": "intermediate",
+     "prompt": "Which word means the opposite of 'ancient'?",
+     "choices": ["modern", "old", "broken", "large"], "answer": 0,
+     "explanation": "'Ancient' means very old, so the opposite is 'modern'."},
+    {"section": "Vocabulary in Context", "level": "intermediate",
+     "prompt": "Which word best completes the sentence?\n\nAfter the long hike, the travelers were so ______ "
+               "that they fell asleep as soon as they sat down.",
+     "choices": ["exhausted", "delighted", "curious", "generous"], "answer": 0,
+     "explanation": "Falling asleep right away after a long hike points to being very tired: 'exhausted'."},
+    {"section": "Reading Comprehension", "level": "intermediate",
+     "passage": "Bees collect nectar from flowers to make honey. While they do this, pollen sticks to their "
+                "bodies and is carried to other flowers, which helps plants make seeds.",
+     "prompt": "According to the text, how do bees help plants?",
+     "choices": ["By eating their leaves", "By carrying pollen from flower to flower",
+                 "By digging up the soil", "By blocking the sunlight"], "answer": 1,
+     "explanation": "The text says pollen sticks to bees and is carried to other flowers, helping plants make seeds."},
+    {"section": "Reading Comprehension", "level": "intermediate",
+     "passage": "Maya packed her lunch, grabbed her umbrella, and checked the sky one more time. Gray clouds "
+                "covered the hills, and the wind had started to pick up. She decided to leave early so she "
+                "wouldn't be caught in the storm.",
+     "prompt": "Based on the text, why did Maya decide to leave early?",
+     "choices": ["She was late for lunch.", "She was worried about an approaching storm.",
+                 "She had forgotten her umbrella.", "She wanted to enjoy the sunshine."], "answer": 1,
+     "explanation": "The gray clouds and rising wind suggest a storm, and the text says she left early to avoid it."},
+    {"section": "Reading Comprehension", "level": "intermediate",
+     "passage": "The library on Pine Street opens at 9 a.m. on weekdays and 10 a.m. on weekends. It closes at "
+                "6 p.m. every day except Friday, when it stays open until 8 p.m. for evening study sessions.",
+     "prompt": "According to the text, what time does the library close on Friday?",
+     "choices": ["6 p.m.", "8 p.m.", "9 a.m.", "10 a.m."], "answer": 1,
+     "explanation": "The text says it stays open until 8 p.m. on Friday."},
+
+    {"section": "Reading Comprehension", "level": "intermediate",
+     "passage": "A caterpillar eats leaves all day to grow bigger. After a few weeks, it wraps itself in a "
+                "cocoon. Inside, it slowly changes into a butterfly.",
+     "prompt": "What happens right after the caterpillar wraps itself in a cocoon?",
+     "choices": ["It eats more leaves.", "It slowly changes inside the cocoon.",
+                 "It flies away right away.", "It digs underground."], "answer": 1,
+     "explanation": "The text says that inside the cocoon, the caterpillar slowly changes into a butterfly."},
+    {"section": "Vocabulary in Context", "level": "intermediate",
+     "prompt": "Which word best completes the sentence?\n\nThe baby was ______, so she smiled and laughed all afternoon.",
+     "choices": ["cheerful", "gloomy", "furious", "sleepy"], "answer": 0,
+     "explanation": "Smiling and laughing show a happy mood: 'cheerful'."},
+    {"section": "Reading Comprehension", "level": "intermediate",
+     "passage": "When Ana got home, the kitchen floor was wet, her dog was covered in mud, and the back door "
+                "was open.",
+     "prompt": "What most likely happened?",
+     "choices": ["Ana went swimming.", "The dog went outside, got muddy, and came back in.",
+                 "Someone cleaned the floor.", "It was a hot, sunny day."], "answer": 1,
+     "explanation": "A muddy dog, a wet floor and an open back door suggest the dog went out and came back in."},
+    {"section": "Reading Comprehension", "level": "intermediate",
+     "passage": "Recycling helps the planet. When we recycle paper, glass, and cans, we make less trash. We "
+                "also save energy, because new items do not have to be made from scratch.",
+     "prompt": "What is the main idea of the passage?",
+     "choices": ["Recycling is expensive.", "Recycling helps the planet by making less trash and saving energy.",
+                 "Paper is the most common kind of trash.", "Everyone should buy new things."], "answer": 1,
+     "explanation": "The whole passage explains how recycling helps: less trash and less energy used."},
+
+    # (more hard questions)
+    {"section": "Vocabulary in Context", "level": "hard",
      "prompt": "Which choice completes the text with the most logical and precise word?\n\n"
                "The scientist's explanation was ______; even readers with no background in physics could follow it.",
      "choices": ["lucid", "ornate", "tentative", "elusive"], "answer": 0,
      "explanation": "The clause after the semicolon says anyone could follow it, so the explanation was clear: 'lucid'."},
-    {"section": "Reading & Writing",
-     "prompt": "Which choice completes the text with the most logical transition?\n\n"
-               "Many cities have added protected bike lanes to reduce traffic congestion. ______ studies suggest "
-               "the lanes also improve safety for pedestrians.",
-     "choices": ["However,", "Instead,", "Moreover,", "Otherwise,"], "answer": 2,
-     "explanation": "The second sentence adds another benefit rather than contrasting, so 'Moreover' fits."},
-    {"section": "Reading & Writing",
-     "prompt": "Which choice is a complete, correctly punctuated sentence?",
-     "choices": ["The experiment failed, the team revised its method.",
-                 "The experiment failed; so the team revised its method.",
-                 "The experiment failed, so the team revised its method.",
-                 "The experiment failed so, the team revised its method."], "answer": 2,
-     "explanation": "Two independent clauses joined by 'so' need a comma before the conjunction. "
-                    "A comma alone is a comma splice, and a semicolon shouldn't precede 'so'."},
-    {"section": "Reading & Writing",
+    {"section": "Vocabulary in Context", "level": "hard",
+     "prompt": "Which choice completes the text with the most logical and precise word?\n\n"
+               "Although the new policy was meant to help, many residents found its rules so ______ that they "
+               "could not tell what was actually required of them.",
+     "choices": ["ambiguous", "ambitious", "affordable", "enthusiastic"], "answer": 0,
+     "explanation": "Residents couldn't tell what was required, so the rules were unclear: 'ambiguous'."},
+    {"section": "Vocabulary in Context", "level": "hard",
+     "passage": "The coach's feedback was blunt but never cruel: she told players exactly what needed to change "
+                "and then showed them how to fix it.",
+     "prompt": "As used in the text, what does 'blunt' most nearly mean?",
+     "choices": ["straightforward", "dull", "angry", "careless"], "answer": 0,
+     "explanation": "The text says she told players exactly what to change, so 'blunt' means direct and "
+                    "straightforward here, not 'dull' (the other common meaning)."},
+    {"section": "Reading Comprehension", "level": "hard",
      "passage": "When engineers first proposed using drones to survey remote wetlands, many ecologists were "
                 "skeptical, worried that the noise would disturb nesting birds. But field tests showed that at "
                 "altitudes above 60 meters the birds' behavior was essentially unchanged, and the drones "
@@ -103,69 +173,253 @@ QUESTIONS = [
                  "Nesting birds are unaffected by any kind of human activity."], "answer": 1,
      "explanation": "The text moves from an initial worry to test results showing little disturbance and faster "
                     "data collection. Choice B captures both parts."},
+    {"section": "Reading Comprehension", "level": "hard",
+     "passage": "Octopuses are known for their talent at escaping. One aquarium noticed that fish were "
+                "disappearing overnight. Staff eventually discovered that the octopus was leaving its tank, "
+                "eating fish from a neighboring tank, and returning to its own tank before morning.",
+     "prompt": "Which inference is best supported by the text?",
+     "choices": ["The octopus was not being fed enough.",
+                 "The octopus could move between tanks without being noticed.",
+                 "The aquarium staff had been feeding the fish too little.",
+                 "Octopuses prefer to live in groups."], "answer": 1,
+     "explanation": "The octopus left, ate, and came back before morning without being caught, so it could move "
+                    "between tanks unnoticed. The text says nothing about feeding or group living."},
+    {"section": "Reading Comprehension", "level": "hard",
+     "passage": "For decades, many people believed the Great Wall of China could be seen from space with the "
+                "naked eye. In reality, astronauts have reported that the wall is far too narrow to pick out "
+                "from orbit. Highways and city lights are much easier to spot.",
+     "prompt": "Which choice best describes the main purpose of the text?",
+     "choices": ["To correct a common misconception", "To argue that the wall should be preserved",
+                 "To describe how the wall was built", "To compare ancient and modern structures"], "answer": 0,
+     "explanation": "The text states a popular belief and then explains why it is not true."},
 
-    # ---- Easy warm-ups: Math ----
-    {"section": "Easy Math",
-     "prompt": "What is the value of 8 + 5 × 2?",
-     "choices": ["16", "18", "20", "26"], "answer": 1,
-     "explanation": "Multiply before adding: 5 × 2 = 10, and 8 + 10 = 18."},
-    {"section": "Easy Math",
-     "prompt": "What is 25% of 80?",
-     "choices": ["15", "20", "25", "40"], "answer": 1,
-     "explanation": "25% is one quarter, and 80 ÷ 4 = 20."},
-    {"section": "Easy Math",
-     "prompt": "If x + 9 = 15, what is the value of x?",
-     "choices": ["5", "6", "7", "24"], "answer": 1,
-     "explanation": "Subtract 9 from both sides: x = 15 − 9 = 6."},
-    {"section": "Easy Math",
-     "prompt": "A rectangle is 8 units long and 3 units wide. What is its area?",
-     "choices": ["11", "22", "24", "32"], "answer": 2,
-     "explanation": "Area = length × width = 8 × 3 = 24."},
-    {"section": "Easy Math",
-     "prompt": "Which of these numbers is the greatest?",
-     "choices": ["0.5", "0.45", "0.6", "0.09"], "answer": 2,
-     "explanation": "Compare tenths first: 0.6 has 6 tenths, more than any of the others."},
-    {"section": "Easy Math",
-     "prompt": "A pencil costs $0.50. How much do 6 pencils cost?",
-     "choices": ["$2.50", "$3.00", "$3.50", "$4.00"], "answer": 1,
-     "explanation": "6 × $0.50 = $3.00."},
-    {"section": "Easy Math",
-     "prompt": "What is the average (mean) of 4, 6, and 8?",
-     "choices": ["5", "6", "7", "8"], "answer": 1,
-     "explanation": "Add them: 4 + 6 + 8 = 18. Then divide by 3: 18 ÷ 3 = 6."},
-    {"section": "Easy Math",
-     "prompt": "If 2x = 14, what is the value of x?",
-     "choices": ["5", "7", "12", "28"], "answer": 1,
-     "explanation": "Divide both sides by 2: x = 14 ÷ 2 = 7."},
-
-    # ---- Easy warm-ups: Reading & Writing ----
-    {"section": "Easy Reading & Writing",
-     "prompt": "Which choice completes the sentence correctly?\n\nShe ______ to school every day.",
-     "choices": ["go", "goes", "going", "gone"], "answer": 1,
-     "explanation": "'She' is singular, so the present-tense verb takes an -s: 'goes'."},
-    {"section": "Easy Reading & Writing",
-     "prompt": "Which word is closest in meaning to 'enormous'?",
-     "choices": ["tiny", "huge", "quiet", "quick"], "answer": 1,
-     "explanation": "'Enormous' means very large, which is 'huge'."},
-    {"section": "Easy Reading & Writing",
-     "prompt": "Which choice completes the text with the most logical transition?\n\n"
-               "It was raining hard. ______ we brought umbrellas.",
-     "choices": ["However,", "Therefore,", "For example,", "Likewise,"], "answer": 1,
-     "explanation": "The umbrellas are a result of the rain, so 'Therefore' fits."},
-    {"section": "Easy Reading & Writing",
-     "prompt": "Which choice correctly completes the sentence?\n\nThe ______ toys were scattered across the floor.",
-     "choices": ["childrens", "children's", "childrens'", "childrens's"], "answer": 1,
-     "explanation": "'Children' is already plural, so the possessive adds apostrophe + s: 'children's'."},
-    {"section": "Easy Reading & Writing",
-     "passage": "Bees collect nectar from flowers to make honey. While they do this, pollen sticks to their "
-                "bodies and is carried to other flowers, which helps plants make seeds.",
-     "prompt": "According to the text, how do bees help plants?",
-     "choices": ["By eating their leaves", "By carrying pollen from flower to flower",
-                 "By digging up the soil", "By blocking the sunlight"], "answer": 1,
-     "explanation": "The text says pollen sticks to bees and is carried to other flowers, helping plants make seeds."},
+    # ========================= HARD =========================
+    {"section": "Vocabulary in Context", "level": "hard",
+     "prompt": "Which choice completes the text with the most logical and precise word?\n\n"
+               "The senator's reply was characteristically ______: although it sounded like a direct answer, "
+               "it committed her to nothing.",
+     "choices": ["evasive", "candid", "exuberant", "meticulous"], "answer": 0,
+     "explanation": "A reply that sounds direct but commits to nothing is avoiding the question: 'evasive'. "
+                    "'Candid' would mean frank and open, the opposite."},
+    {"section": "Reading Comprehension", "level": "hard",
+     "passage": "Economists often assume that people choose the cheapest option available. But a study of "
+                "grocery shoppers found that many consistently paid more for a familiar brand, even when an "
+                "identical store brand sat on the same shelf. The researchers concluded that the shoppers "
+                "were not being irrational; they were paying for the certainty that the product would taste "
+                "the way they expected.",
+     "prompt": "Which choice best describes the researchers' conclusion?",
+     "choices": ["Shoppers are generally careless with their money.",
+                 "Paying more can reflect a reasonable preference for predictability.",
+                 "Store brands are lower in quality than name brands.",
+                 "Economists' assumptions hold true for all shoppers."], "answer": 1,
+     "explanation": "The researchers say shoppers 'were not being irrational' but were paying for certainty. "
+                    "Choice B restates this. The text never says store brands are worse."},
+    {"section": "Reading Comprehension", "level": "hard",
+     "passage": "Critics of the restoration argued that repainting the mural would erase decades of weathering "
+                "that had become part of its character. Yet the conservators pointed out that the 'weathering' "
+                "admirers loved was largely soot and grime obscuring the artist's original colors. Cleaning, "
+                "not repainting, they said, would reveal the artwork rather than replace it.",
+     "prompt": "How do the conservators respond to the critics' concern?",
+     "choices": ["By arguing that the weathering the critics value is actually dirt covering the original colors",
+                 "By agreeing that repainting would erase the mural's character",
+                 "By proposing to replace the mural with an exact copy",
+                 "By claiming that the artist intended the mural to age"], "answer": 0,
+     "explanation": "The conservators say the 'weathering' is mostly soot and grime hiding the original colors, "
+                    "and that cleaning would reveal the work."},
+    {"section": "Reading Comprehension", "level": "hard",
+     "passage": "Although the novel was widely praised on release for its sweeping plot, later readers have "
+                "tended to admire something quieter: the way the narrator's descriptions of ordinary rooms and "
+                "meals reveal her loneliness without her ever naming it.",
+     "prompt": "What does the text suggest about later readers' view of the novel?",
+     "choices": ["They find the plot more impressive than early readers did.",
+                 "They value its subtle portrayal of the narrator's emotions more than its plot.",
+                 "They believe the narrator names her loneliness too often.",
+                 "They think the novel was overpraised on release."], "answer": 1,
+     "explanation": "Later readers admire 'something quieter': the indirect way loneliness is shown. "
+                    "The text doesn't say they dislike the plot or think the novel was overpraised."},
+    {"section": "Reading Comprehension", "level": "hard",
+     "prompt": "A student claims that rooftop gardens can lower a building's energy use. Which finding, if "
+               "true, would most directly support the student's claim?",
+     "choices": ["Rooftop gardens are popular with residents.",
+                 "Buildings with rooftop gardens had summer cooling costs 15% lower than similar buildings without them.",
+                 "Rooftop gardens require regular watering.",
+                 "Many rooftop gardens grow herbs and vegetables."], "answer": 1,
+     "explanation": "Only choice B connects rooftop gardens to a measurable drop in energy use (cooling costs)."},
+    {"section": "Reading Comprehension", "level": "hard",
+     "passage": "Researchers studying sleep found that students who slept eight hours before an exam scored "
+                "higher on average than students who stayed up studying. However, the students who slept more "
+                "had also tended to begin studying earlier in the week.",
+     "prompt": "Which choice most logically completes the text? \"This suggests that ______\"",
+     "choices": ["all-night studying is always harmful.",
+                 "the score difference may be due partly to when students began studying, not to sleep alone.",
+                 "sleeping eight hours is unnecessary before an exam.",
+                 "studying earlier in the week has no effect on scores."], "answer": 1,
+     "explanation": "The sleepers also started studying earlier, so that could explain some of the difference. "
+                    "The other choices overreach beyond the evidence."},
 ]
 
+# --------------------------------------------------------------------------
+# Lots more VERY EASY questions (kept compact: built from the tables below)
+# --------------------------------------------------------------------------
+def _mc(section, prompt, right, wrong, explanation, passage=None, level="easy"):
+    """Build a question whose first choice is the right one (answer order is shuffled at runtime)."""
+    q = {"section": section, "level": level, "prompt": prompt,
+         "choices": [right] + list(wrong), "answer": 0, "explanation": explanation}
+    if passage:
+        q["passage"] = passage
+    return q
+
+
+# (word, same meaning, three wrong answers)
+_SYNONYMS = [
+    ("small", "tiny", ["giant", "loud", "green"]),
+    ("fast", "quick", ["slow", "heavy", "sleepy"]),
+    ("begin", "start", ["stop", "finish", "wait"]),
+    ("sad", "unhappy", ["joyful", "silly", "brave"]),
+    ("smart", "clever", ["lazy", "quiet", "messy"]),
+    ("shut", "close", ["open", "break", "lift"]),
+    ("jump", "leap", ["crawl", "sit", "sleep"]),
+    ("pretty", "beautiful", ["ugly", "noisy", "heavy"]),
+    ("afraid", "scared", ["brave", "sleepy", "hungry"]),
+    ("rock", "stone", ["feather", "cloud", "puddle"]),
+]
+
+# (word, opposite, three wrong answers)
+_OPPOSITES = [
+    ("up", "down", ["high", "over", "top"]),
+    ("day", "night", ["morning", "noon", "sunny"]),
+    ("full", "empty", ["heavy", "round", "tall"]),
+    ("open", "closed", ["wide", "empty", "loud"]),
+    ("tall", "short", ["thin", "wide", "long"]),
+    ("soft", "hard", ["quiet", "warm", "smooth"]),
+    ("wet", "dry", ["cold", "muddy", "clean"]),
+    ("early", "late", ["first", "soon", "quick"]),
+]
+
+# (sentence, right word, three wrong words)
+_FILL_INS = [
+    ("I wear a ______ on my head when it is cold.", "hat", ["shoe", "sock", "spoon"]),
+    ("A bird can ______ in the sky.", "fly", ["dig", "drive", "melt"]),
+    ("We use ______ to cut paper.", "scissors", ["a spoon", "a pillow", "a ladder"]),
+    ("The sun rises in the ______.", "morning", ["night", "moon", "snow"]),
+    ("Fish live in the ______.", "water", ["tree", "desert", "cloud"]),
+    ("I brush my ______ every morning.", "teeth", ["socks", "desk", "window"]),
+    ("A cow gives us ______.", "milk", ["eggs", "wool", "honey"]),
+    ("We read a ______ to enjoy a story.", "book", ["fork", "door", "shoe"]),
+]
+
+# (passage, question, right answer, three wrong answers, explanation)
+_EASY_PASSAGES = [
+    ("Mia has a small brown dog named Biscuit. Every afternoon, they walk to the park.",
+     "What is the dog's name?", "Biscuit", ["Mia", "Brownie", "Max"],
+     "The text says the dog is named Biscuit."),
+    ("The bus comes at 7:30 each morning. Jake waits at the corner with his backpack.",
+     "What does Jake have with him?", "A backpack", ["An umbrella", "A kite", "A skateboard"],
+     "The text says he waits with his backpack."),
+    ("A snail moves very slowly. It carries its shell on its back.",
+     "Where does a snail carry its shell?", "On its back", ["In its mouth", "On its head", "In a bag"],
+     "The text says it carries its shell on its back."),
+    ("Grandma baked a chocolate cake for Ben's birthday. Ben blew out the candles and made a wish.",
+     "What kind of cake did Grandma bake?", "Chocolate", ["Vanilla", "Strawberry", "Lemon"],
+     "The text says she baked a chocolate cake."),
+    ("Ants work together to carry food back to their nest. Many ants can lift a crumb that one ant "
+     "cannot move.",
+     "Why do ants work together?", "To move food that is too big for one ant",
+     ["To play a game", "To scare other animals", "To keep warm"],
+     "Many ants can lift a crumb that one ant cannot move."),
+    ("On Monday, Zoe planted a seed in a pot. By Friday, a tiny green sprout had popped up.",
+     "What happened by Friday?", "A tiny green sprout grew", ["The pot broke", "Zoe bought a new pot", "It snowed"],
+     "The text says a tiny green sprout had popped up."),
+    ("Max put on his swim trunks and grabbed a towel. He jumped into the pool with a big splash.",
+     "Where did Max jump?", "Into the pool", ["Into the ocean", "Onto the couch", "Into a boat"],
+     "The text says he jumped into the pool."),
+    ("The moon is bright at night. Stars twinkle in the dark sky.",
+     "When is the moon bright, according to the text?", "At night", ["At lunch", "At breakfast", "At recess"],
+     "The text says the moon is bright at night."),
+    ("Kai's bike has two wheels, a bell, and a basket.",
+     "How many wheels does Kai's bike have?", "Two", ["One", "Three", "Four"],
+     "The text says the bike has two wheels."),
+    ("Rosa wrote a letter to her friend. She put a stamp on the envelope and dropped it in the mailbox.",
+     "Where did Rosa put the letter?", "In the mailbox", ["In her backpack", "In the trash", "Under her bed"],
+     "She dropped it in the mailbox."),
+    ("Frogs start life as eggs in the water. The eggs hatch into tadpoles, which grow legs and become frogs.",
+     "What do frog eggs hatch into?", "Tadpoles", ["Fish", "Birds", "Snails"],
+     "The text says the eggs hatch into tadpoles."),
+    ("The class went to the zoo on Tuesday. They saw lions, monkeys, and a giant tortoise.",
+     "Which animal did the class see?", "A monkey", ["A whale", "A horse", "A penguin"],
+     "The text lists monkeys among the animals they saw."),
+    ("Eli was thirsty after soccer practice. He drank a big glass of water.",
+     "Why did Eli drink water?", "He was thirsty", ["He was cold", "He was sleepy", "He was lost"],
+     "The text says Eli was thirsty."),
+    ("It rained all morning, so the picnic was moved inside. The family ate sandwiches on the living room floor.",
+     "Why was the picnic moved inside?", "Because of the rain",
+     ["Because the park was closed", "Because they were late", "Because it was too hot"],
+     "The text says it rained all morning."),
+    ("Honeybees live in a hive. They make honey from flower nectar.",
+     "What do honeybees make honey from?", "Nectar from flowers", ["Tree bark", "Rain water", "Grass seeds"],
+     "The text says they make honey from flower nectar."),
+    ("Nina has three pencils, two erasers, and one ruler in her pencil case.",
+     "How many pencils does Nina have?", "Three", ["One", "Two", "Four"],
+     "The text says she has three pencils."),
+    ("Dad turned on the oven and put the pizza inside. After twenty minutes, the whole house smelled delicious.",
+     "What did Dad put in the oven?", "A pizza", ["A cake", "A pie", "Bread"],
+     "The text says he put the pizza inside."),
+    ("The tree in Lucas's yard drops its leaves in the fall. In winter, the branches are bare.",
+     "When are the tree's branches bare?", "In winter", ["In summer", "In spring", "On his birthday"],
+     "The text says the branches are bare in winter."),
+    ("Tara loves to draw. She uses crayons to make pictures of animals.",
+     "What does Tara use to draw?", "Crayons", ["Chalk", "Paint", "Markers"],
+     "The text says she uses crayons."),
+    ("A giraffe has a very long neck. It uses it to reach leaves at the tops of tall trees.",
+     "Why does a giraffe use its long neck?", "To reach leaves high in the trees",
+     ["To swim", "To dig holes", "To hide from the rain"],
+     "The text says it uses its neck to reach leaves at the tops of tall trees."),
+    ("Owen's alarm rang at 6:00. He got out of bed, brushed his teeth, and ate breakfast.",
+     "What did Owen do right after getting out of bed?", "He brushed his teeth",
+     ["He ate breakfast", "He went to school", "He watched TV"],
+     "He got out of bed, then brushed his teeth, then ate breakfast."),
+    ("The farmer wakes up early to milk the cows. Then he feeds the chickens and collects eggs.",
+     "What does the farmer do right after milking the cows?", "He feeds the chickens",
+     ["He goes back to bed", "He plants corn", "He drives to town"],
+     "The text says 'Then he feeds the chickens.'"),
+    ("Sara found a shiny shell on the beach. She put it in her pocket to take home.",
+     "Where did Sara find the shell?", "On the beach", ["In her garden", "In a store", "At school"],
+     "The text says she found it on the beach."),
+    ("Whales are not fish. They are mammals that breathe air through a hole on top of their heads.",
+     "How do whales breathe?", "Through a hole on top of their heads",
+     ["Through gills", "Through their tails", "Through their fins"],
+     "The text says they breathe air through a hole on top of their heads."),
+    ("Ravi was nervous about his first day at a new school. But his teacher smiled and showed him his "
+     "desk, and soon he felt better.",
+     "How did Ravi feel at the start of the day?", "Nervous", ["Bored", "Silly", "Proud"],
+     "The text says he was nervous about his first day."),
+    ("In the fall, geese fly south, where it is warmer. They fly in a V shape.",
+     "Why do geese fly south in the fall?", "To find warmer weather",
+     ["To find snow", "To visit the zoo", "To learn to swim"],
+     "The text says they fly south where it is warmer."),
+]
+
+for _w, _right, _wrong in _SYNONYMS:
+    QUESTIONS.append(_mc("Vocabulary in Context", f"Which word means the same as '{_w}'?", _right, _wrong,
+                         f"'{_w.capitalize()}' and '{_right}' mean almost the same thing."))
+for _w, _right, _wrong in _OPPOSITES:
+    QUESTIONS.append(_mc("Vocabulary in Context", f"Which word means the opposite of '{_w}'?", _right, _wrong,
+                         f"'{_right.capitalize()}' is the opposite of '{_w}'."))
+for _sentence, _right, _wrong in _FILL_INS:
+    QUESTIONS.append(_mc("Vocabulary in Context",
+                         "Which word best completes the sentence?\n\n" + _sentence, _right, _wrong,
+                         f"'{_right}' is the choice that makes the sentence make sense."))
+for _passage, _question, _right, _wrong, _why in _EASY_PASSAGES:
+    QUESTIONS.append(_mc("Reading Comprehension", _question, _right, _wrong, _why, passage=_passage))
+
 LETTERS = "ABCD"
+
+# Question difficulty -> what the video does
+VIDEO_MODE = {"easy": "video", "intermediate": "audio", "hard": "pause"}
+VOLUME = {"video": 100, "audio": 30, "pause": 100}   # % volume per mode (audio = intermediate questions)
+SPEED = {"video": 1, "audio": 1, "pause": 1}          # playback speed per mode (YouTube allows 0.25-2)
+MODE_LABEL = {"video": "▶ Video on", "audio": f"🎧 Audio only · {VOLUME['audio']}% volume",
+              "pause": "⏸ Paused"}
 
 # --------------------------------------------------------------------------
 # YouTube helpers
@@ -189,13 +443,243 @@ def youtube_embed_url(text: str):
     return None
 
 
+PLAYER_HTML = """PLAYER_HTML =
+<html>
+<body style="margin:0;background:#000">
+
+<iframe id="yt"
+    src="__SRC__"
+    style="position:absolute;inset:0;width:100%;height:100%;border:0"
+    allow="autoplay; encrypted-media; picture-in-picture"
+    referrerpolicy="strict-origin-when-cross-origin">
+</iframe>
+
+<div id="cover" style="
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#e9ecf5;
+    color:#000;
+    font:600 16px sans-serif;
+    text-align:center;
+    padding:16px;
+    opacity:0;
+    visibility:hidden;
+    transition:opacity 1.5s ease;
+    pointer-events:none;">
+</div>
+
+<script>
+
+var VOL = __VOL__;
+var RATE = __RATE__;
+var cur = "__MODE__";
+
+// Transition settings
+const FADE_DURATION = 3000;  // milliseconds
+const FADE_STEPS = 30;
+
+let currentVolume = VOL[cur];
+let fadeInterval = null;
+let pauseTimeout = null;
+
+function cmd(f, a) {
+    document.getElementById("yt").contentWindow.postMessage(
+        JSON.stringify({
+            event:"command",
+            func:f,
+            args:a===undefined ? "" : a
+        }),
+        "*"
+    );
+}
+
+function setVolume(v) {
+    currentVolume = Math.max(0, Math.min(100, v));
+    cmd("setVolume", [Math.round(currentVolume)]);
+}
+
+function rate(m) {
+    cmd("setPlaybackRate", [RATE[m]]);
+}
+
+// Gradually change volume
+function fadeVolume(target, duration, callback) {
+
+    if (fadeInterval !== null) {
+        clearInterval(fadeInterval);
+        fadeInterval = null;
+    }
+
+    let startVolume = currentVolume;
+    let startTime = performance.now();
+
+    fadeInterval = setInterval(function() {
+
+        let elapsed = performance.now() - startTime;
+        let progress = Math.min(elapsed / duration, 1);
+
+        // Smooth easing
+        let eased = progress * progress * (3 - 2 * progress);
+
+        let newVolume =
+            startVolume + (target - startVolume) * eased;
+
+        setVolume(newVolume);
+
+        if (progress >= 1) {
+
+            clearInterval(fadeInterval);
+            fadeInterval = null;
+
+            setVolume(target);
+
+            if (callback) callback();
+        }
+
+    }, duration / FADE_STEPS);
+}
+
+// Gradually show/hide video
+function fadeVideo(show, message) {
+
+    let cover = document.getElementById("cover");
+
+    if (message) {
+        cover.textContent = message;
+    }
+
+    if (show) {
+        cover.style.opacity = "0";
+
+        setTimeout(function() {
+            if (cover.style.opacity === "0") {
+                cover.style.visibility = "hidden";
+            }
+        }, FADE_DURATION);
+
+    } else {
+        cover.style.visibility = "visible";
+        cover.style.opacity = "1";
+    }
+}
+
+// Main transition function
+function setMode(m) {
+
+    if (pauseTimeout !== null) {
+        clearTimeout(pauseTimeout);
+        pauseTimeout = null;
+    }
+
+    cur = m;
+
+    cmd("unMute");
+    rate(m);
+
+    if (m === "video") {
+
+        // Resume playback
+        cmd("playVideo");
+
+        // Gradually reveal video
+        fadeVideo(true);
+
+        // Fade audio to full volume
+        fadeVolume(VOL.video, FADE_DURATION);
+
+    } else if (m === "audio") {
+
+        // Keep video playing
+        cmd("playVideo");
+
+        // Gradually hide picture
+        fadeVideo(false, "🎧 Audio only");
+
+        // Reduce volume gradually
+        fadeVolume(VOL.audio, FADE_DURATION);
+
+    } else if (m === "pause") {
+
+        // Gradually hide picture
+        fadeVideo(false, "⏸ Paused during hard questions");
+
+        // Fade audio to silence
+        fadeVolume(0, FADE_DURATION, function() {
+
+            // Only pause if still in hard mode
+            if (cur === "pause") {
+                cmd("pauseVideo");
+            }
+        });
+    }
+}
+
+// Initial appearance
+function initializePlayer() {
+
+    if (cur === "video") {
+
+        fadeVideo(true);
+        setVolume(VOL.video);
+
+    } else if (cur === "audio") {
+
+        fadeVideo(false, "🎧 Audio only");
+        setVolume(VOL.audio);
+
+    } else {
+
+        fadeVideo(false, "⏸ Paused during hard questions");
+        setVolume(0);
+        cmd("pauseVideo");
+    }
+}
+
+// Reapply settings while YouTube initializes
+function applySettingsSoon() {
+
+    [500, 1500, 3000, 6000].forEach(function(t) {
+
+        setTimeout(function() {
+
+            if (fadeInterval === null) {
+                setVolume(cur === "pause" ? 0 : VOL[cur]);
+            }
+
+            rate(cur);
+
+        }, t);
+    });
+}
+
+document.getElementById("yt").addEventListener(
+    "load",
+    applySettingsSoon
+);
+
+initializePlayer();
+applySettingsSoon();
+
+</script>
+</body>
+</html>
+"""
+
+
 class VideoPanel(QWidget):
     """Small YouTube player embedded in the main window (bottom-right)."""
 
     def __init__(self):
         super().__init__()
         self.setObjectName("videoPanel")
-        self.setFixedSize(420, 320)
+        self.setFixedSize(640, 480)
+        self.mode = "video"   # "video" | "audio" | "pause"
+        self.status = QLabel(MODE_LABEL[self.mode])
+        self.curVol = 100
+        self.fadeTimer = 0
 
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("Paste a YouTube link…")
@@ -220,7 +704,11 @@ class VideoPanel(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
-        layout.addWidget(QLabel("YouTube player"))
+        header = QHBoxLayout()
+        header.addWidget(QLabel("YouTube player"))
+        header.addStretch(1)
+        header.addWidget(self.status)
+        layout.addLayout(header)
         layout.addLayout(bar)
         layout.addWidget(self.view, 1)
 
@@ -229,14 +717,21 @@ class VideoPanel(QWidget):
         if not src:
             self.show_message("That doesn't look like a YouTube link.")
             return
-        html = (
-            '<html><body style="margin:0;background:#000">'
-            f'<iframe src="{src}" style="position:absolute;inset:0;width:100%;height:100%;border:0" '
-            'allow="autoplay; encrypted-media; picture-in-picture" '
-            'referrerpolicy="strict-origin-when-cross-origin"></iframe></body></html>'
-        )
+        # Start in whatever state the current question calls for.
+        autoplay = 0 if self.mode == "pause" else 1
+        src = src.replace("autoplay=1", f"autoplay={autoplay}")
+        src += "&enablejsapi=1&origin=https%3A%2F%2Flocalhost"
+        html = PLAYER_HTML.replace("__SRC__", src).replace("__MODE__", self.mode).replace("__VOL__", json.dumps(VOLUME)).replace("__RATE__", json.dumps(SPEED))
         # A real-looking base URL gives YouTube the origin/referrer it wants for embeds.
         self.view.setHtml(html, QUrl("https://localhost/"))
+
+    def set_mode(self, mode):
+        """Switch between normal video, audio-only and paused (only acts on a change)."""
+        if mode == self.mode:
+            return
+        self.mode = mode
+        self.status.setText(MODE_LABEL[mode])
+        self.view.page().runJavaScript(f'if (typeof setMode === "function") setMode("{mode}");')
 
     def stop(self):
         self.show_message("Paste a YouTube link above and press Play.")
@@ -275,8 +770,8 @@ class SatWindow(QMainWindow):
         self.all_questions = list(QUESTIONS)
         self.pool, self.results, self.i = [], {}, 0
 
-        self.setWindowTitle("SAT Practice")
-        self.resize(1000, 720)
+        self.setWindowTitle("SAT Reading Practice")
+        self.resize(1100, 740)
         self.setStyleSheet(STYLE)
         self._build_ui()
         self._build_menu()
@@ -294,11 +789,16 @@ class SatWindow(QMainWindow):
         top = QHBoxLayout()
         self.section_box = QComboBox()
         self.section_box.currentIndexChanged.connect(self.start_session)
+        self.level_box = QComboBox()
+        self.level_box.addItems(["All", "Easy", "Intermediate", "Hard"])
+        self.level_box.currentIndexChanged.connect(self.start_session)
         self.meta = QLabel(objectName="meta")
         self.video_btn = QPushButton("Show / hide video")
         self.video_btn.clicked.connect(self.toggle_video)
         top.addWidget(QLabel("Section:"))
         top.addWidget(self.section_box)
+        top.addWidget(QLabel("Difficulty:"))
+        top.addWidget(self.level_box)
         top.addStretch(1)
         top.addWidget(self.meta)
         top.addWidget(self.video_btn)
@@ -343,8 +843,17 @@ class SatWindow(QMainWindow):
         left.addStretch(1)
         left.addLayout(btns)
         bottom.addLayout(left, 1)
-        bottom.addWidget(self.video, 0, Qt.AlignmentFlag.AlignBottom)
         v.addLayout(bottom)
+
+        # centers the video player horizontally
+        video_row = QHBoxLayout()
+        video_row.addStretch(1)
+        video_row.addWidget(self.video)
+        video_row.addStretch(1)
+
+        v.addLayout(video_row)
+
+        v.addStretch(1)
 
         # Keyboard shortcuts: A-D choose, Enter submits, arrows navigate
         for k, key in enumerate("ABCD"):
@@ -373,8 +882,20 @@ class SatWindow(QMainWindow):
         if self.section_box.count() == 0:
             self.refresh_sections()
         sec = self.section_box.currentText()
-        qs = [dict(q) for q in self.all_questions if sec in ("All", q["section"])]
+        lvl = self.level_box.currentText().lower()
+        qs = [dict(q) for q in self.all_questions
+              if sec in ("All", q["section"]) and lvl in ("all", q.get("level", "intermediate"))]
         random.shuffle(qs)
+        # Hard questions are held back until the second half of the session.
+        not_hard = [q for q in qs if q.get("level", "intermediate") != "hard"]
+        hard = [q for q in qs if q.get("level", "intermediate") == "hard"]
+        half = len(qs) // 2
+        if len(not_hard) >= half:
+            first, rest = not_hard[:half], not_hard[half:] + hard
+            random.shuffle(rest)
+        else:  # not enough easier questions to fill the first half: use them all, then the hard ones
+            first, rest = not_hard, hard
+        qs = first + rest
         for q in qs:  # shuffle answer order, remembering the mapping
             q["order"] = random.sample(range(len(q["choices"])), len(q["choices"]))
         self.pool, self.results, self.i = qs, {}, 0
@@ -385,6 +906,7 @@ class SatWindow(QMainWindow):
             self.prompt.setText("No questions in this section.")
             return
         q = self.pool[self.i]
+        self.video.set_mode(VIDEO_MODE[q.get("level", "intermediate")])
         self.passage.setVisible(bool(q.get("passage")))
         self.passage.setText(q.get("passage", ""))
         self.prompt.setText(q["prompt"])
@@ -446,7 +968,8 @@ class SatWindow(QMainWindow):
     def update_meta(self):
         right = sum(1 for i, c in self.results.items()
                     if c == self.pool[i]["order"].index(self.pool[i]["answer"]))
-        self.meta.setText(f"Question {self.i + 1} of {len(self.pool)}   |   "
+        level = self.pool[self.i].get("level", "intermediate").title()
+        self.meta.setText(f"Question {self.i + 1} of {len(self.pool)}   |   Level: {level}   |   "
                           f"Score: {right}/{len(self.results)}")
 
     # ---- Misc ----
@@ -462,6 +985,7 @@ class SatWindow(QMainWindow):
                 data = json.load(f)
             for q in data:
                 assert {"section", "prompt", "choices", "answer"} <= q.keys()
+                assert q.get("level", "intermediate") in VIDEO_MODE, "level must be easy, intermediate or hard"
                 assert 2 <= len(q["choices"]) <= 4 and 0 <= q["answer"] < len(q["choices"])
         except Exception as e:  # noqa: BLE001
             QMessageBox.warning(self, "Couldn't load file",
