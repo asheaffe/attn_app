@@ -697,8 +697,8 @@ class SatWindow(QMainWindow):
 
             question_layout.addLayout(row)
 
-        self.feedback = LatexWidget()
-        self.feedback.setWordWrap(True)
+        self.feedback = QLabel()
+        #self.feedback.setWordWrap(True)
         self.feedback.setStyleSheet("font-size: 15px; color: #000;")
         question_layout.addWidget(self.feedback)
         question_layout.addStretch(1)
@@ -826,9 +826,9 @@ class SatWindow(QMainWindow):
             # 60 questions total
             ### this is hard-coded, will want to set to change on input later ###
             target_counts = {
-                "easy": 20,
-                "intermediate": 20,
-                "hard": 20
+                "easy": 10,
+                "intermediate": 10,
+                "hard": 10
             }
 
             selected = []
@@ -842,7 +842,7 @@ class SatWindow(QMainWindow):
                 selected.extend(questions[:count])
                 remaining.extend(questions[count:])
 
-            slots_left = 60 - len(selected)
+            slots_left = 30 - len(selected)
 
             if slots_left > 0:
                 selected.extend(
@@ -854,7 +854,7 @@ class SatWindow(QMainWindow):
             qs = selected
 
         else:
-            qs = random.sample(qs, min(60, len(qs)))
+            qs = random.sample(qs, min(30, len(qs)))
 
         random.shuffle(qs)
 
@@ -945,7 +945,7 @@ class SatWindow(QMainWindow):
 
         self.group.setExclusive(True)
 
-        #self.feedback.clear()
+        self.feedback.clear()
         answered = self.i in self.results
         for r in self.radios:
             r.setEnabled(not answered)
