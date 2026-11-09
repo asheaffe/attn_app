@@ -397,16 +397,16 @@ class VideoPanel(QWidget):
         self.has_video = False   # True once a YouTube link has been loaded with Play
         self.status = QLabel(MODE_LABEL[self.mode])
 
-        self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("Paste a YouTube link…")
-        self.url_input.returnPressed.connect(self.play)
+        # self.url_input = QLineEdit()
+        # self.url_input.setPlaceholderText("Paste a YouTube link…")
+        #self.url_input.returnPressed.connect(self.play)
         play_btn = QPushButton("Play")
         play_btn.clicked.connect(self.play)
         stop_btn = QPushButton("Stop")
         stop_btn.clicked.connect(self.stop)
 
         bar = QHBoxLayout()
-        bar.addWidget(self.url_input, 1)
+        #bar.addWidget(self.url_input, 1)
         bar.addWidget(play_btn)
         bar.addWidget(stop_btn)
 
@@ -417,16 +417,16 @@ class VideoPanel(QWidget):
         seg = QGridLayout()
         seg.addWidget(QLabel("Video:"), 0, 0)
         placement = {"follow": (0, 1, 1, 1), "on": (0, 2, 1, 1), "off": (0, 3, 1, 1), "half": (1, 1, 1, 3)}
-        for key, label in (("follow", "By difficulty"), ("on", "Always on"), ("off", "Always off"),
-                           ("half", "Test: half on, half off (random order)")):
-            b = QPushButton(label, objectName="seg")
-            b.setCheckable(True)
-            b.setChecked(key == "follow")
-            b.clicked.connect(lambda _checked, k=key: self.setting_changed.emit(k))
-            self.setting_group.addButton(b)
-            self.setting_buttons[key] = b
-            seg.addWidget(b, *placement[key])
-        seg.setColumnStretch(4, 1)
+        # for key, label in (("follow", "By difficulty"), ("on", "Always on"), ("off", "Always off"),
+        #                    ("half", "Test: half on, half off (random order)")):
+        #     b = QPushButton(label, objectName="seg")
+        #     b.setCheckable(True)
+        #     b.setChecked(key == "follow")
+        #     b.clicked.connect(lambda _checked, k=key: self.setting_changed.emit(k))
+        #     self.setting_group.addButton(b)
+        #     self.setting_buttons[key] = b
+        #     seg.addWidget(b, *placement[key])
+        # seg.setColumnStretch(4, 1)
 
         self.view = QWebEngineView()
         self.view.settings().setAttribute(
@@ -452,7 +452,7 @@ class VideoPanel(QWidget):
         self.setting_buttons[key].setChecked(True)
 
     def play(self):
-        src = youtube_embed_url(self.url_input.text())
+        src = youtube_embed_url("https://www.youtube.com/watch?v=1baVt4UrP3k")
         if not src:
             self.show_message("That doesn't look like a YouTube link.")
             return
@@ -526,17 +526,18 @@ class SatWindow(QMainWindow):
         self.video_actions = {}
         self.all_questions = list(QUESTIONS)
         self.pool, self.results, self.i = [], {}, 0
-        self.video_setting = "follow"          # "follow" | "on" | "off" | "half"
+        self.video_setting = "half"          # "follow" | "on" | "off" | "half"
         self.hold_hard_late = False            # hard questions only in the 2nd half (off by default)
         self.balance_levels = True             # equal number of easy / intermediate / hard per session
         self._checked_path = None
-        self.half_order = "on_first"           # "on_first" | "off_first" (re-randomized every session)
+        self.half_order = random.choice(["on_first", "off_first"])           # "on_first" | "off_first" (re-randomized every session)
         self.results_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"data-files/sat_results.csv")
         self.session_id = ""
         self.q_elapsed, self.q_shown_at = {}, None   # per-question time on screen (seconds)
         self._warned_csv = False
 
         self.elapsed_seconds = 0
+        self.answer_submitted = False
 
         self.timer = QTimer(self)
         self.timer.setInterval(1000)    # updates every second
@@ -708,14 +709,15 @@ class SatWindow(QMainWindow):
 
         btns = QHBoxLayout()
         self.prev_btn = QPushButton("← Previous")
-        self.submit_btn = QPushButton("Submit", objectName="primary")
-        self.next_btn = QPushButton("Next →")
-        self.restart_btn = QPushButton("Restart / reshuffle")
+        #self.submit_btn = QPushButton("Submit", objectName="primary")
+
+        self.next_btn = QPushButton("Submit", objectName="primary")
+        #self.restart_btn = QPushButton("Restart / reshuffle")
         self.prev_btn.clicked.connect(lambda: self.go(-1))
-        self.next_btn.clicked.connect(lambda: self.go(+1))
-        self.submit_btn.clicked.connect(self.submit)
-        self.restart_btn.clicked.connect(self.start_session)
-        for b in (self.prev_btn, self.submit_btn, self.next_btn, self.restart_btn):
+        # self.next_btn.clicked.connect(lambda: self.go(+1))
+        self.next_btn.clicked.connect(self.handle_submit_next)
+        #self.restart_btn.clicked.connect(self.start_session)
+        for b in (self.prev_btn, self.next_btn):
             btns.addWidget(b)
         btns.addStretch(1)
         v.addLayout(btns)
@@ -761,6 +763,18 @@ class SatWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key.Key_Right), self, activated=lambda: self.go(+1))
         QShortcut(QKeySequence(Qt.Key.Key_Left), self, activated=lambda: self.go(-1))
 
+    def handle_submit_next(self):
+        answered = self.i in self.results
+
+        if answered:
+            if self.i < len(self.pool) - 1:
+                
+                # answer has been submitted, move to next question
+                self.go(+1)
+        else:
+            # submit current answer
+            self.submit()
+
     def _build_menu(self):
         file_menu = self.menuBar().addMenu("&File")
         load = QAction("Load questions (JSON)…", self)
@@ -770,18 +784,18 @@ class SatWindow(QMainWindow):
         choose.triggered.connect(self.choose_results_file)
         file_menu.addAction(choose)
 
-        video_menu = self.menuBar().addMenu("&Video")
-        group = QActionGroup(self)
-        group.setExclusive(True)
-        for key, label in (("follow", "Follow question difficulty"), ("on", "Always on"), ("off", "Always off"),
-                           ("half", "Test: half on, half off (random order)")):
-            act = QAction(label, self)
-            act.setCheckable(True)
-            act.setChecked(key == self.video_setting)
-            act.triggered.connect(lambda _checked, k=key: self.set_video_setting(k))
-            self.video_actions[key] = act
-            group.addAction(act)
-            video_menu.addAction(act)
+        # video_menu = self.menuBar().addMenu("&Video")
+        # group = QActionGroup(self)
+        # group.setExclusive(True)
+        # for key, label in (("follow", "Follow question difficulty"), ("on", "Always on"), ("off", "Always off"),
+        #                    ("half", "Test: half on, half off (random order)")):
+        #     act = QAction(label, self)
+        #     act.setCheckable(True)
+        #     act.setChecked(key == self.video_setting)
+        #     act.triggered.connect(lambda _checked, k=key: self.set_video_setting(k))
+        #     self.video_actions[key] = act
+        #     group.addAction(act)
+        #     video_menu.addAction(act)
 
         session_menu = self.menuBar().addMenu("&Session")
         balance = QAction("Equal number of easy, intermediate and hard questions", self)
@@ -861,14 +875,6 @@ class SatWindow(QMainWindow):
         self.elapsed_seconds = 0
         self.timer_label.setText("Time: 00:00")
 
-        #self.timer.start()
-        
-            # for q in qs:
-            #     by_level.setdefault(q.get("level", "intermediate"), []).append(q)
-            # per_level = min((len(v) for v in by_level.values()), default=0)
-            # qs = [q for v in by_level.values() for q in random.sample(v, per_level)]
-        
-
         if self.hold_hard_late:   # optional: hard questions are held back until the second half
             not_hard = [q for q in qs if q.get("level", "intermediate") != "hard"]
             hard = [q for q in qs if q.get("level", "intermediate") == "hard"]
@@ -946,17 +952,37 @@ class SatWindow(QMainWindow):
         self.group.setExclusive(True)
 
         self.feedback.clear()
+
         answered = self.i in self.results
+
         for r in self.radios:
             r.setEnabled(not answered)
-        self.submit_btn.setEnabled(not answered)
+
         if answered:
-            self.radios[self.results[self.i]].setChecked(True)
-            self.show_feedback(q, self.results[self.i])
+            chosen = self.results[self.i]
+
+            # restore previously selected answer
+            self.radios[chosen].setChecked(True)
+
+            # displays feedback
+            self.show_feedback(q, chosen)
+
+            # button advances to the next question
+            self.next_btn.setText("Next")
+
+        else:
+            # question hasn't been answered
+            self.next_btn.setText("Submit")
+
         self.prev_btn.setEnabled(self.i > 0)
-        self.next_btn.setEnabled(self.i < len(self.pool) - 1)
-        self.update_meta()
-        self._start_timer()
+
+        # disable next only if we're on the last question and it hasn't been answered
+        self.next_btn.setEnabled(not answered or self.i < len(self.pool) - 1)
+
+        self.update_meta() 
+
+        if not answered:
+            self._start_timer()
 
     def _pick(self, k):
         if self.i not in self.results and k < len(self.radios) and self.radios[k].isVisible():
@@ -965,16 +991,22 @@ class SatWindow(QMainWindow):
     def submit(self):
         if not self.pool or self.i in self.results:
             return
+        
         chosen = self.group.checkedId()
         if chosen < 0:
             self.feedback.setText("<b>Pick an answer first.</b>")
             return
+        
+        self.next_btn
         self._stop_timer()
         self.results[self.i] = chosen
+
         for r in self.radios:
             r.setEnabled(False)
-        self.submit_btn.setEnabled(False)
+
+        #self.next_btn.setEnabled(False)
         self.show_feedback(self.pool[self.i], chosen)
+
         self.update_meta()
         self.log_answer(self.pool[self.i], chosen)
 
@@ -986,6 +1018,8 @@ class SatWindow(QMainWindow):
             head = (f"<b>✗ Incorrect.</b> "
                     f"The correct answer is <b>{LETTERS[correct_pos]}</b>.")
         self.feedback.setText(f"{head}<br>{q.get('explanation', '')}")
+    
+        self.next_btn.setText("Next")
 
     def go(self, step):
         if self.pool and 0 <= self.i + step < len(self.pool):
