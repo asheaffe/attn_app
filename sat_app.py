@@ -393,9 +393,9 @@ class VideoPanel(QWidget):
         super().__init__()
         self.setObjectName("videoPanel")
         self.setMinimumWidth(380)
-        self.mode = "video"   # "video" | "audio" | "pause" | "off"
-        self.has_video = False   # True once a YouTube link has been loaded with Play
-        self.status = QLabel(MODE_LABEL[self.mode])
+        self.mode = "half"   # "video" | "audio" | "pause" | "off"
+        
+        #self.status = QLabel(MODE_LABEL[self.mode])
 
         # self.url_input = QLineEdit()
         # self.url_input.setPlaceholderText("Paste a YouTube link…")
@@ -413,10 +413,11 @@ class VideoPanel(QWidget):
         # Segmented control: should the video follow the question difficulty, or always be on / off?
         self.setting_group = QButtonGroup(self)
         self.setting_group.setExclusive(True)
-        self.setting_buttons = {}
+        self.setting_buttons = {"follow": "By difficulty", "on": "Always on", "off": "Always off",
+                                        "half": "Test: half on, half off (random order)"}
         seg = QGridLayout()
         seg.addWidget(QLabel("Video:"), 0, 0)
-        placement = {"follow": (0, 1, 1, 1), "on": (0, 2, 1, 1), "off": (0, 3, 1, 1), "half": (1, 1, 1, 3)}
+        # placement = {"follow": (0, 1, 1, 1), "on": (0, 2, 1, 1), "off": (0, 3, 1, 1), "half": (1, 1, 1, 3)}
         # for key, label in (("follow", "By difficulty"), ("on", "Always on"), ("off", "Always off"),
         #                    ("half", "Test: half on, half off (random order)")):
         #     b = QPushButton(label, objectName="seg")
@@ -436,31 +437,35 @@ class VideoPanel(QWidget):
         self.view.page().fullScreenRequested.connect(lambda req: req.reject())
         self.stop()
 
+        self.play()
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
         header = QHBoxLayout()
         header.addWidget(QLabel("YouTube player"))
         header.addStretch(1)
-        header.addWidget(self.status)
+        #header.addWidget(self.status)
         layout.addLayout(header)
         layout.addLayout(seg)
         layout.addLayout(bar)
         layout.addWidget(self.view, 1)
 
-    def show_setting(self, key):
-        """Reflect the current setting on the buttons (without emitting a change)."""
-        self.setting_buttons[key].setChecked(True)
-
     def play(self):
-        src = youtube_embed_url("https://www.youtube.com/watch?v=1baVt4UrP3k")
+        src = youtube_embed_url("https://youtu.be/yGZ9RWvpKq0?si=ToUG6xsdrwZDrJkw")
+        
+        # adding video autoplay to the link
+        src = src + "?autoplay=1&playsinline=1"
+
         if not src:
             self.show_message("That doesn't look like a YouTube link.")
             return
+        
         # Start in whatever state the current question calls for.
-        autoplay = 0 if self.mode in ("pause", "off") else 1
-        src = src.replace("autoplay=1", f"autoplay={autoplay}")
-        src += "&enablejsapi=1&origin=https%3A%2F%2Flocalhost"
-        html = PLAYER_HTML.replace("__SRC__", src).replace("__MODE__", self.mode).replace("__VOL__", json.dumps(VOLUME)).replace("__RATE__", json.dumps(SPEED))
+        # autoplay = 0 if self.mode in ("pause", "off") else 1
+        # src = src.replace("autoplay=1", f"autoplay={autoplay}")
+        # src += "&enablejsapi=1&origin=https%3A%2F%2Flocalhost"
+
+        html = PLAYER_HTML.replace("__SRC__", src).replace("__MODE__", "play").replace("__VOL__", json.dumps(VOLUME)).replace("__RATE__", json.dumps(SPEED))
         # A real-looking base URL gives YouTube the origin/referrer it wants for embeds.
         self.view.setHtml(html, QUrl("https://localhost/"))
         self.has_video = True
@@ -470,7 +475,7 @@ class VideoPanel(QWidget):
         if mode == self.mode:
             return
         self.mode = mode
-        self.status.setText(MODE_LABEL[mode])
+        #self.status.setText(MODE_LABEL[mode])
         self.view.page().runJavaScript(f'if (typeof setMode === "function") setMode("{mode}");')
 
     def stop(self):
@@ -522,15 +527,22 @@ class SatWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.video = VideoPanel()
-        self.video.setting_changed.connect(self.set_video_setting)
-        self.video_actions = {}
+        #self.video.setting_changed.connect(self.set_video_setting)
+
         self.all_questions = list(QUESTIONS)
         self.pool, self.results, self.i = [], {}, 0
+
+        # for randomization of video order
+        self.half_order = random.choice(["on_first", "off_first"]) 
+        
+        self.video_actions = {}
+        self.set_video_setting("half")
+        
         self.video_setting = "half"          # "follow" | "on" | "off" | "half"
         self.hold_hard_late = False            # hard questions only in the 2nd half (off by default)
         self.balance_levels = True             # equal number of easy / intermediate / hard per session
         self._checked_path = None
-        self.half_order = random.choice(["on_first", "off_first"])           # "on_first" | "off_first" (re-randomized every session)
+                  # "on_first" | "off_first" (re-randomized every session)
         self.results_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"data-files/sat_results.csv")
         self.session_id = ""
         self.q_elapsed, self.q_shown_at = {}, None   # per-question time on screen (seconds)
@@ -539,9 +551,18 @@ class SatWindow(QMainWindow):
         self.elapsed_seconds = 0
         self.answer_submitted = False
 
+        # timer for each question
         self.timer = QTimer(self)
         self.timer.setInterval(1000)    # updates every second
-        self.timer.timeout.connect(self.update_timer)
+        self.timer.timeout.connect(self.update_countdown)
+
+        ## SET THE TIME LIMIT PER QUESTION ##
+        self.question_time_limit = 120
+        self.time_remaining = self.question_time_limit
+
+        self.countdown_timer = QTimer(self)
+        self.countdown_timer.setInterval(1000)  # updates every second
+        self.countdown_timer.timeout.connect(self.update_countdown)
 
         self.setWindowTitle("SAT Practice")
         geo = QGuiApplication.primaryScreen().availableGeometry()
@@ -568,7 +589,8 @@ class SatWindow(QMainWindow):
         self.meta = QLabel(objectName="meta")
         self.video_btn = QPushButton("Show / hide video")
         self.video_btn.clicked.connect(self.toggle_video)
-        self.timer_label = QLabel("Time: 00:00")
+
+        self.timer_label = QLabel("Time Remaining for question: 01:30")
 
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -583,32 +605,13 @@ class SatWindow(QMainWindow):
             }        
         """)
 
-        # timer starts on button press
-        self.start_timer_button = QPushButton("Start Timer")
-        self.start_timer_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                font-size: 16px;
-                font-weight: bold;
-                padding: 10px;
-                border-radius: 6px;
-            }
-
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-
-        self.start_timer_button.clicked.connect(self.timer.start)
-
         top.addWidget(QLabel("Section:"))
         top.addWidget(self.section_box)
         top.addWidget(QLabel("Difficulty:"))
         top.addWidget(self.level_box)
         top.addStretch(1)
         #top.addWidget(self.video_btn)
-        top.addWidget(self.start_timer_button)
+        #top.addWidget(self.start_timer_button)
         top.addWidget(self.timer_label)
         v.addLayout(top)
         v.addWidget(self.meta)
@@ -783,19 +786,6 @@ class SatWindow(QMainWindow):
         choose = QAction("Choose results CSV file…", self)
         choose.triggered.connect(self.choose_results_file)
         file_menu.addAction(choose)
-
-        # video_menu = self.menuBar().addMenu("&Video")
-        # group = QActionGroup(self)
-        # group.setExclusive(True)
-        # for key, label in (("follow", "Follow question difficulty"), ("on", "Always on"), ("off", "Always off"),
-        #                    ("half", "Test: half on, half off (random order)")):
-        #     act = QAction(label, self)
-        #     act.setCheckable(True)
-        #     act.setChecked(key == self.video_setting)
-        #     act.triggered.connect(lambda _checked, k=key: self.set_video_setting(k))
-        #     self.video_actions[key] = act
-        #     group.addAction(act)
-        #     video_menu.addAction(act)
 
         session_menu = self.menuBar().addMenu("&Session")
         balance = QAction("Equal number of easy, intermediate and hard questions", self)
@@ -1037,6 +1027,16 @@ class SatWindow(QMainWindow):
     # ---- Timing + CSV results ----
     def _start_timer(self):
         """Start timing the question on screen (answered questions aren't timed again)."""
+        self.countdown_timer.stop()
+
+        self.time_remaining = self.question_time_limit
+
+        self.timer_label.setText("Time Remaining: 01:30")
+        self.timer_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; color: black;"
+        )
+        self.countdown_timer.start()
+        
         self.q_shown_at = None if self.i in self.results else time.monotonic()
 
     def _stop_timer(self):
@@ -1045,15 +1045,47 @@ class SatWindow(QMainWindow):
             self.q_elapsed[self.i] = self.q_elapsed.get(self.i, 0.0) + (time.monotonic() - self.q_shown_at)
             self.q_shown_at = None
 
-    def update_timer(self):
-        self.elapsed_seconds += 1
+    def update_countdown(self):
+        self.time_remaining -= 1
 
-        minutes = self.elapsed_seconds // 60
-        seconds = self.elapsed_seconds % 60
+        minutes = self.time_remaining // 60
+        seconds = self.time_remaining % 60
 
         self.timer_label.setText(
-            f"Time: {minutes:02d}:{seconds:02d}"
+            f"Time Remaining: {minutes:02d}:{seconds:02d}"
         )
+
+        if self.time_remaining <= 10:
+            self.timer_label.setStyleSheet(
+                "font-size: 18px; font-weight: bold; color: red;"
+            )
+
+        if self.time_remaining <= 0:
+            self.countdown_timer.stop()
+            self.time_remaining = 0
+            self.handle_timeout()
+
+    def handle_timeout(self):
+        if not self.pool or self.i in self.results:
+            return
+        
+        # -1 represents no answer
+        chosen = -1
+
+        self._stop_timer()
+        self.results[self.i] = chosen
+
+        for r in self.radios:
+            r.setEnabled(False)
+
+        self.next_btn.setEnabled(False)
+
+        self.show_feedback(self.pool[self.i], chosen)
+        self.update_meta()
+        self.log_answer(self.pool[self.i], chosen)
+
+        # automatically advance to the next question
+        QTimer.singleShot(1000, lambda: self.go(+1))
 
     def log_answer(self, q, chosen):
         correct_pos = q["order"].index(q["answer"])
@@ -1149,7 +1181,7 @@ class SatWindow(QMainWindow):
 
     def set_video_setting(self, key):
         self.video_setting = key
-        self.video.show_setting(key)           # on-screen buttons
+        #self.video.show_setting(key)           # on-screen buttons
         if key in self.video_actions:          # menu
             self.video_actions[key].setChecked(True)
         self.apply_video_mode()
