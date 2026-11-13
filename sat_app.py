@@ -5,19 +5,8 @@ Install:   pip install PyQt6 PyQt6-WebEngine
 Run:       python sat_app.py
 """
 
-import csv
-import json
-import os
-import random
-import re
 import sys
-import time
-import requests
-import html
 import re
-
-from datetime import datetime
-from pathlib import Path
 
 from sat_app_pages.SatWindow import SatWindow
 from sat_app_pages.ReadyDialog import ReadyDialog
@@ -44,10 +33,11 @@ def main():
     win = SatWindow()
     win.show()
 
-    dialog = ReadyDialog(win)
+    dialog = ReadyDialog(win, training=True)
 
     if dialog.exec() == QDialog.DialogCode.Accepted:
-        win.start_experiment()
+        win.start_training()
+        #win.start_experiment()
     else:
         win.close()
 

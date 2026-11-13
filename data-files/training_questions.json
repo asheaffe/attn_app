@@ -1,0 +1,113 @@
+
+[
+  {
+    "id": "train001",
+    "section": "english",
+    "domain": "Information and Ideas",
+    "visuals": {
+      "type": "null",
+      "svg_content": "null"
+    },
+    "question": {
+      "choices": {
+        "A": "She wanted to exercise.",
+        "B": "She wanted to buy groceries.",
+        "C": "She wanted to visit a friend.",
+        "D": "She wanted to study."
+      },
+      "question": "Why did Maya go to the park?",
+      "paragraph": "Maya went to the park to take a walk and enjoy the fresh air. She walked along the path for thirty minutes before returning home.",
+      "explanation": "Maya went to the park to walk and enjoy the fresh air, which is a form of exercise.",
+      "correct_answer": "A"
+    },
+    "difficulty": "easy"
+  },
+  {
+    "id": "train002",
+    "section": "english",
+    "domain": "Craft and Structure",
+    "visuals": {
+      "type": "null",
+      "svg_content": "null"
+    },
+    "question": {
+      "choices": {
+        "A": "Angry",
+        "B": "Joyful",
+        "C": "Confused",
+        "D": "Tired"
+      },
+      "question": "Which word is closest in meaning to 'happy'?",
+      "paragraph": "After receiving good news, Jordan felt happy and smiled throughout the day.",
+      "explanation": "'Joyful' is closest in meaning to 'happy' because both describe a feeling of happiness.",
+      "correct_answer": "B"
+    },
+    "difficulty": "easy"
+  },
+  {
+    "id": "train003",
+    "section": "math",
+    "domain": "Algebra",
+    "visuals": {
+      "type": "null",
+      "svg_content": "null"
+    },
+    "question": {
+      "choices": {
+        "A": "11",
+        "B": "12",
+        "C": "13",
+        "D": "14"
+      },
+      "question": "What is 8 + 5?",
+      "paragraph": null,
+      "explanation": "Adding 8 and 5 gives 13, so the correct answer is C.",
+      "correct_answer": "C"
+    },
+    "difficulty": "easy"
+  },
+  {
+    "id": "train004",
+    "section": "math",
+    "domain": "Algebra",
+    "visuals": {
+      "type": "null",
+      "svg_content": "null"
+    },
+    "question": {
+      "choices": {
+        "A": "5",
+        "B": "6",
+        "C": "7",
+        "D": "8"
+      },
+      "question": "If x + 3 = 10, what is the value of x?",
+      "paragraph": null,
+      "explanation": "Subtract 3 from both sides of the equation: x = 10 - 3 = 7.",
+      "correct_answer": "C"
+    },
+    "difficulty": "easy"
+  },
+  {
+    "id": "train005",
+    "section": "math",
+    "domain": "Problem-Solving and Data Analysis",
+    "visuals": {
+      "type": "null",
+      "svg_content": "null"
+    },
+    "question": {
+      "choices": {
+        "A": "$7",
+        "B": "$10",
+        "C": "$12",
+        "D": "$16"
+      },
+      "question": "A notebook costs $4. How much do 3 notebooks cost?",
+      "paragraph": null,
+      "explanation": "Multiply the price of one notebook by 3: $4 × 3 = $12.",
+      "correct_answer": "C"
+    },
+    "difficulty": "easy"
+  }
+]

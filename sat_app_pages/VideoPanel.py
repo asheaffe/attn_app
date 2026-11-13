@@ -131,7 +131,7 @@ class VideoPanel(QWidget):
         self.setting_buttons = {"follow": "By difficulty", "on": "Always on", "off": "Always off",
                                         "half": "Test: half on, half off (random order)"}
         seg = QGridLayout()
-        seg.addWidget(QLabel("Video:"), 0, 0)
+        # seg.addWidget(QLabel("Video:"), 0, 0)
 
         self.view = QWebEngineView()
         self.view.setPage(DebugWebEnginePage(self.view))
@@ -145,7 +145,6 @@ class VideoPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
         header = QHBoxLayout()
-        header.addWidget(QLabel("YouTube player"))
         header.addStretch(1)
         layout.addLayout(header)
         layout.addLayout(seg)
@@ -191,15 +190,11 @@ class VideoPanel(QWidget):
             "&enablejsapi=1"
             "&origin=https%3A%2F%2Flocalhost"
         )
-        print(src)
 
         html = PLAYER_HTML.replace("__SRC__", src).replace("__MODE__", json.dumps(self.mode))
 
         self.view.page().setAudioMuted(False)
 
-        print("Loading PLAYER_HTML", flush=True)
-        print("Contains debug logging:", "PLAYER READY" in html, flush=True)
-        print("HTML length:", len(html), flush=True)
         self.view.setHtml(html, QUrl("https://localhost/"))
 
         self.has_video = True
@@ -208,9 +203,16 @@ class VideoPanel(QWidget):
         """Switch between video / audio-only / paused / off (only acts on a change)."""
         if mode == self.mode:
             return
+        
         self.mode = mode
-        #self.status.setText(MODE_LABEL[mode])
-        self.view.page().runJavaScript(f'if (typeof setMode === "function") setMode("{mode}");')
+
+        # block audio at the Qt level during off conditions
+        self.view.page().setAudioMuted(mode in ("off", "pause"))
+
+        # update youtube player
+        self.view.page().runJavaScript(
+            f"setMode({json.dumps(mode)})"
+        )
 
     def stop(self):
         self.has_video = False

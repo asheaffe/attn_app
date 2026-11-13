@@ -2,26 +2,20 @@ import csv
 import json
 import os
 import random
-import re
-import sys
 import time
-import requests
-import html
-import re
 
 from datetime import datetime
 from pathlib import Path
 
 from sat_app_pages.VideoPanel import VideoPanel
 from sat_app_pages.LatexWidget import LatexWidget
+from sat_app_pages.ReadyDialog import ReadyDialog
 
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QTimer
-from PyQt6.QtGui import QAction, QActionGroup, QColor, QGuiApplication, QKeySequence, QPalette, QShortcut
-from PyQt6.QtWebEngineCore import QWebEngineSettings
-from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QAction, QGuiApplication, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QApplication, QButtonGroup, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
-    QLineEdit, QMainWindow, QMessageBox, QPushButton, QRadioButton,
+    QButtonGroup, QFileDialog, QHBoxLayout, QLabel, QDialog,
+    QMainWindow, QMessageBox, QPushButton, QRadioButton,
     QSplitter, QVBoxLayout, QWidget, QSizePolicy, QScrollArea
 )
 
@@ -127,6 +121,7 @@ ANSWER_MAP = {"A": 0, "B": 1, "C": 2, "D": 3}
 
 LETTERS = "ABCD"
 QUESTIONS = load_questions(BASE_DIR / "data-files" / "opensat_questions.json")
+TRAINING_QUESTIONS = load_questions(BASE_DIR / "data-files" / "training_questions.json")
 
 CSV_FIELDS = ["timestamp", "session_id", "question_number", "session_half", "section", "level", "question",
               "chosen_answer", "correct_answer", "correct", "seconds_to_answer",
@@ -136,24 +131,26 @@ class SatWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.all_questions = list(QUESTIONS)
+        self.training_questions = list(TRAINING_QUESTIONS)
         self.pool = []
         self.results = {} 
         self.i = 0
 
+        # start in training mode
+        self.training_mode = True
+        self.experiment_started = False
+
         self.video_actions = {}
         self.video_setting = "half"
         
-        self.hold_hard_late = False            # hard questions only in the 2nd half (off by default)
-        self.balance_levels = True             # equal number of easy / intermediate / hard per session
         self._checked_path = None
                   # "on_first" | "off_first" (re-randomized every session)
-        self.results_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"data-files/sat_results.csv")
+        self.results_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), f"data-files/sat_results.csv")
         self.session_id = ""
         self.q_elapsed, self.q_shown_at = {}, None   # per-question time on screen (seconds)
         self._warned_csv = False
 
         self.elapsed_seconds = 0
-        self.answer_submitted = False
 
         # timer for each question
         self.timer = QTimer(self)
@@ -168,7 +165,7 @@ class SatWindow(QMainWindow):
         self.countdown_timer.setInterval(1000)  # updates every second
         self.countdown_timer.timeout.connect(self.update_countdown)
 
-        self.setWindowTitle("SAT Practice")
+        self.setWindowTitle("SAT Media-Multitasking")
         geo = QGuiApplication.primaryScreen().availableGeometry()
         self.resize(min(geo.width(), 1500), min(geo.height(), 860))
         self.setStyleSheet(STYLE)
@@ -296,15 +293,12 @@ class SatWindow(QMainWindow):
         v.addWidget(question_scroll, 1)
 
         btns = QHBoxLayout()
-        self.prev_btn = QPushButton("← Previous")
 
         self.next_btn = QPushButton("Submit", objectName="primary")
-        self.prev_btn.clicked.connect(lambda: self.go(-1))
 
         self.next_btn.clicked.connect(self.handle_submit_next)
         
-        for b in (self.prev_btn, self.next_btn):
-            btns.addWidget(b)
+        btns.addWidget(self.next_btn)
         btns.addStretch(1)
         v.addLayout(btns)
 
@@ -340,6 +334,18 @@ class SatWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key.Key_Right), self, activated=lambda: self.go(+1))
         QShortcut(QKeySequence(Qt.Key.Key_Left), self, activated=lambda: self.go(-1))
 
+    def start_training(self):
+        # use the training questions
+        #self.pool = list(self.training_questions)
+        self.i = 0
+        self.results = {}
+
+        self._build_ui()
+        self._build_menu()
+
+        # start the session
+        self.start_session()
+    
     def start_experiment(self):
         # starts the session
         self._build_ui()
@@ -361,6 +367,21 @@ class SatWindow(QMainWindow):
 
         self.video.play()
    
+    def finish_training(self):
+        self._stop_timer()
+        self.training_mode = False
+
+        # reset question count vars
+        self.i = 0
+        self.results = {}
+
+        # show ready dialog again
+        dialog = ReadyDialog(self, training=False)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.start_experiment()
+        else:
+            self.close()
 
     def handle_submit_next(self):
         answered = self.i in self.results
@@ -368,11 +389,15 @@ class SatWindow(QMainWindow):
         if answered:
             if self.i < len(self.pool) - 1:
                 
-                # answer has been submitted, move to next question
+                self.feedback.clear()
                 self.go(+1)
-        else:
-            # submit current answer
-            self.submit()
+
+            else:
+                self.finish_training()
+
+        else:   
+                # submit current answer
+                self.submit()
 
     def _build_menu(self):
         file_menu = self.menuBar().addMenu("&File")
@@ -384,25 +409,21 @@ class SatWindow(QMainWindow):
         file_menu.addAction(choose)
 
         session_menu = self.menuBar().addMenu("&Session")
-        balance = QAction("Equal number of easy, intermediate and hard questions", self)
-        balance.setCheckable(True)
-        balance.setChecked(self.balance_levels)
-        balance.triggered.connect(self.set_balance)
-        session_menu.addAction(balance)
-        hold = QAction("Hold hard questions until the second half", self)
-        hold.setCheckable(True)
-        hold.setChecked(self.hold_hard_late)
-        hold.triggered.connect(self.set_hold_hard)
-        session_menu.addAction(hold)
+        # hold = QAction("Hold hard questions until the second half", self)
+        # hold.setCheckable(True)
+        # hold.setChecked(self.hold_hard_late)
+        # hold.triggered.connect(self.set_hold_hard)
+        # session_menu.addAction(hold)
 
         self.statusBar().showMessage(f"Saving results to: {self.results_path}")
 
     def start_session(self):
-        lvl = "all"     # TODO: this is hard-coded for now lolololol
-        qs = [dict(q) for q in self.all_questions
-              if lvl in ("all", q.get("level", "intermediate"))]
-        
-        if self.balance_levels and lvl == "all":
+        if not self.training_mode:
+
+            lvl = "all"     # TODO: this is hard-coded for now lolololol
+            qs = [dict(q) for q in self.all_questions
+                if lvl in ("all", q.get("level", "intermediate"))]
+            
             # Equal numbers per level: draw as many from each level as the smallest level has.
             by_level = {
                 level: [q for q in qs if q.get("level", "intermediate") == level]
@@ -438,27 +459,15 @@ class SatWindow(QMainWindow):
                     )
                 )
             qs = selected
-
+        
         else:
-            qs = random.sample(qs, min(30, len(qs)))
+            qs = TRAINING_QUESTIONS
 
         random.shuffle(qs)
 
         self.elapsed_seconds = 0
         #self.timer_label.setText("Time: 00:00")
         self.timer.timeout.connect(self.update_countdown)
-
-        if self.hold_hard_late:   # optional: hard questions are held back until the second half
-            not_hard = [q for q in qs if q.get("level", "intermediate") != "hard"]
-            hard = [q for q in qs if q.get("level", "intermediate") == "hard"]
-            half = len(qs) // 2
-            if len(not_hard) >= half:
-                first, rest = not_hard[:half], not_hard[half:] + hard
-                random.shuffle(rest)
-            else:  # not enough easier questions to fill the first half: use them all, then the hard ones
-                first, rest = not_hard, hard
-            qs = first + rest
-
 
         for q in qs:  # shuffle answer order, remembering the mapping
             q["order"] = random.sample(range(len(q["choices"])), len(q["choices"]))
@@ -517,8 +526,6 @@ class SatWindow(QMainWindow):
 
         self.group.setExclusive(True)
 
-        self.feedback.clear()
-
         answered = self.i in self.results
 
         for r in self.radios:
@@ -530,17 +537,15 @@ class SatWindow(QMainWindow):
             # restore previously selected answer
             self.radios[chosen].setChecked(True)
 
-            # displays feedback
-            self.show_feedback(q, chosen)
-
-            # button advances to the next question
-            self.next_btn.setText("Next")
+            # display feedback during training
+            if self.training_mode:
+                self.show_feedback(q, chosen)
 
         else:
             # question hasn't been answered
             self.next_btn.setText("Submit")
 
-        self.prev_btn.setEnabled(self.i > 0)
+        #self.prev_btn.setEnabled(self.i > 0)
 
         # disable next only if we're on the last question and it hasn't been answered
         self.next_btn.setEnabled(not answered or self.i < len(self.pool) - 1)
@@ -559,22 +564,36 @@ class SatWindow(QMainWindow):
             return
         
         chosen = self.group.checkedId()
+
         if chosen < 0:
             self.feedback.setText("<b>Pick an answer first.</b>")
             return
         
-        self.next_btn
+        # stop the timer and record answer
         self._stop_timer()
         self.results[self.i] = chosen
 
+        # disables answer choices
         for r in self.radios:
             r.setEnabled(False)
 
-        #self.next_btn.setEnabled(False)
-        self.show_feedback(self.pool[self.i], chosen)
-
+        # update progress
         self.update_meta()
-        self.log_answer(self.pool[self.i], chosen)
+
+        if self.training_mode:
+            # show feedback and wait for next only in training
+            self.show_feedback(self.pool[self.i], chosen)
+            self.log_answer(self.pool[self.i], chosen)
+
+            self.next_btn.setText("Next")
+            self.next_btn.setEnabled(True)
+        
+        else:
+            # log answer and immediately advance without feedback during experiment
+            self.log_answer(self.pool[self.i], chosen)
+
+            self.feedback.clear()
+            self.go(1)
 
     def show_feedback(self, q, chosen):
         correct_pos = q["order"].index(q["answer"])
@@ -597,8 +616,7 @@ class SatWindow(QMainWindow):
         right = sum(1 for i, c in self.results.items()
                     if c == self.pool[i]["order"].index(self.pool[i]["answer"]))
         level = self.pool[self.i].get("level", "intermediate").title()
-        self.meta.setText(f"Question {self.i + 1} of {len(self.pool)}   |   Level: {level}   |   "
-                          f"Score: {right}/{len(self.results)}")
+        self.meta.setText(f"Question {self.i + 1} of {len(self.pool)}")
 
     # ---- Timing + CSV results ----
     def _start_timer(self):
@@ -656,7 +674,9 @@ class SatWindow(QMainWindow):
 
         self.next_btn.setEnabled(False)
 
-        self.show_feedback(self.pool[self.i], chosen)
+        if self.training_mode:
+            self.show_feedback(self.pool[self.i], chosen)
+            
         self.update_meta()
         self.log_answer(self.pool[self.i], chosen)
 
@@ -677,12 +697,12 @@ class SatWindow(QMainWindow):
             "correct_answer": q["choices"][q["answer"]],
             "correct": int(chosen == correct_pos),
             "seconds_to_answer": round(self.q_elapsed.get(self.i, 0.0), 2),
-            "video_setting": VIDEO_SETTINGS[self.video_setting],
-            "condition_order": ({"on_first": "on_then_off", "off_first": "off_then_on"}[self.half_order]
-                                if self.video_setting == "half" else ""),
-            "video_on": int(self.video.mode == "video"),      # 1 = picture playing, 0 = off / paused / audio only
-            "video_loaded": int(self.video.has_video),        # 0 = no YouTube link had been loaded yet
-            "video_mode": self.video.mode,                    # video | audio (audio only) | pause | off
+            #"video_setting": VIDEO_SETTINGS[self.video_setting],
+            "condition_order": False if self.training_mode else         # ik this is ugly im sorry
+                ("on_then_off" if self.i < len(self.pool)/2 and self.video.mode == "video" else "off_then_on"),
+            "video_on": False if self.training_mode else int(self.video.mode == "video"),      # 1 = picture playing, 0 = off / paused / audio only
+            "video_loaded": False if self.training_mode else int(self.video.has_video),        # 0 = no YouTube link had been loaded yet
+            "video_mode": "training" if self.training_mode else self.video.mode,                    # video | audio (audio only) | pause | off
         }
         try:
             self._prepare_results_file()
@@ -732,6 +752,10 @@ class SatWindow(QMainWindow):
         """Assigns an initial value for the video being on/off based on self.video_setting
         
         :return: str mode setting in "video", "off" """
+        if self.training_mode:
+            mode = "off"
+            return
+        
         mode = ""
 
         if self.video_setting == "half":    # on-vs-off test: one half on, the other off (random order)
@@ -745,13 +769,9 @@ class SatWindow(QMainWindow):
     def _in_first_half(self, i):
         return i < (len(self.pool) + 1) // 2
 
-    def set_balance(self, checked):
-        self.balance_levels = checked
-        self.statusBar().showMessage("Question mix will change the next time you restart the session.")
-
-    def set_hold_hard(self, checked):
-        self.hold_hard_late = checked
-        self.statusBar().showMessage("Hard-question ordering will change the next time you restart the session.")
+    # def set_hold_hard(self, checked):
+    #     self.hold_hard_late = checked
+    #     self.statusBar().showMessage("Hard-question ordering will change the next time you restart the session.")
 
     def set_video_setting(self, key):
         self.video_setting = key
