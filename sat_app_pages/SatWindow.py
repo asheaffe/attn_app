@@ -127,7 +127,7 @@ TRAINING_QUESTIONS = load_questions(BASE_DIR / "data-files" / "training_question
 
 CSV_FIELDS = ["timestamp", "session_id", "question_number", "session_half", "section", "level", "question",
               "chosen_answer", "correct_answer", "correct", "seconds_to_answer",
-              "video_setting", "condition_order", "video_on", "video_loaded", "video_mode"]
+              "video_setting", "condition_order", "video_on", "video_loaded", "video_mode", "timeout"]
 
 class SatWindow(QMainWindow):
     def __init__(self):
@@ -706,15 +706,12 @@ class SatWindow(QMainWindow):
             "section": q["section"],
             "level": q.get("level", "intermediate"),
             "question": " ".join(q["prompt"].split())[:120],
-            "chosen_answer": q["choices"][q["order"][chosen]],
+            "chosen_answer": None if chosen == -1 else q["choices"][q["order"][chosen]],
             "correct_answer": q["choices"][q["answer"]],
             "correct": int(chosen == correct_pos),
-            "seconds_to_answer": round(self.q_elapsed.get(self.i, 0.0), 2),
-            #"video_setting": VIDEO_SETTINGS[self.video_setting],
-            "condition_order": False if self.training_mode else         # ik this is ugly im sorry
-                ("on_then_off" if self.i < len(self.pool)/2 and self.video.mode == "video" else "off_then_on"),
+            "seconds_to_answer": self.q_elapsed.get(self.i, 0.0),
+            "timeout": chosen == -1,
             "video_on": False if self.training_mode else int(self.video.mode == "video"),      # 1 = picture playing, 0 = off / paused / audio only
-            "video_loaded": False if self.training_mode else int(self.video.has_video),        # 0 = no YouTube link had been loaded yet
             "video_mode": "training" if self.training_mode else self.video.mode,                    # video | audio (audio only) | pause | off
         }
         try:
