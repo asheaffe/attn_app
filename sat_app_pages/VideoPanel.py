@@ -180,7 +180,6 @@ class VideoPanel(QWidget):
         # autoplay runs based on current mode
         autoplay = 0 if self.mode in ("pause", "off") else 1
 
-        print(f"MODE = {self.mode}, AUTOPLAY = {autoplay}")
         # separator = "&" if "?" in src else "?"
 
         src += (

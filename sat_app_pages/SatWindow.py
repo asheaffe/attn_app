@@ -67,7 +67,7 @@ def load_questions(file_path):
 
             difficulty = DIFFICULTY_MAP[
                 item["difficulty"].strip().lower()
-            ]
+            ] 
 
             choices = [
                 q["choices"][letter]
@@ -105,6 +105,7 @@ def load_questions(file_path):
                 f"Skipping question "
                 f"{item.get('id', 'unknown')}: {exc}"
             )
+            pass
 
     return questions
 
@@ -112,7 +113,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 DIFFICULTY_MAP = {
     "easy": "easy",
-    "medium": "intermediate",
+    "medium": "easy",       # made the 'medium' questions easy, and making the GRE questions hard
     "intermediate": "intermediate",
     "hard": "hard"
 }
@@ -120,7 +121,8 @@ DIFFICULTY_MAP = {
 ANSWER_MAP = {"A": 0, "B": 1, "C": 2, "D": 3}
 
 LETTERS = "ABCD"
-QUESTIONS = load_questions(BASE_DIR / "data-files" / "opensat_questions.json")
+#QUESTIONS = load_questions(BASE_DIR / "data-files" / "opensat_questions.json")
+QUESTIONS = load_questions(BASE_DIR / "data-files" / "alldata_questions.json")
 TRAINING_QUESTIONS = load_questions(BASE_DIR / "data-files" / "training_questions.json")
 
 CSV_FIELDS = ["timestamp", "session_id", "question_number", "session_half", "section", "level", "question",
@@ -196,7 +198,7 @@ class SatWindow(QMainWindow):
         """)
 
         top.addStretch(1)
-        top.addWidget(self.timer_label)
+        #top.addWidget(self.timer_label)
 
         self.meta = QLabel(objectName="meta")
         v.addLayout(top)
@@ -347,24 +349,30 @@ class SatWindow(QMainWindow):
         self.start_session()
     
     def start_experiment(self):
+        self.training_mode = False
+
         # starts the session
         self._build_ui()
         self._build_menu()
-        self.start_session()
 
         # initialize the videopanel mode with the current mode setting
-        self.video = VideoPanel(self.apply_video_mode())
+        self.video = VideoPanel(mode="off")
 
         # allow the video panel to occupy the right side of the screen
-        self.video.setMinimumWidth(0)
+        self.video.setMinimumWidth(300)
         self.video.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding
         )
-        self.video.setMinimumWidth(300)
 
         self.splitter.addWidget(self.video)
 
+        # generate questions and randomized cond. order
+        self.start_session()
+
+        # load video using the initial condition
+        initial_mode = self.apply_video_mode()
+        self.video.mode = initial_mode
         self.video.play()
    
     def finish_training(self):
@@ -554,6 +562,11 @@ class SatWindow(QMainWindow):
 
         if not answered:
             self._start_timer()
+
+        # update the video mode when changing questions
+        if not self.training_mode and hasattr(self, "video"):
+            new_mode = self.apply_video_mode()
+            self.video.set_mode(new_mode)
 
     def _pick(self, k):
         if self.i not in self.results and k < len(self.radios) and self.radios[k].isVisible():
@@ -753,19 +766,23 @@ class SatWindow(QMainWindow):
         
         :return: str mode setting in "video", "off" """
         if self.training_mode:
-            mode = "off"
-            return
+            return "off"
         
         mode = ""
 
         if self.video_setting == "half":    # on-vs-off test: one half on, the other off (random order)
-            on_now = random.choice([0, 1]) 
-            mode = "video" if on_now else "off"
-        else:
-            mode = {"on": "video", "off": "off"}.get(self.video_setting)
-        print(on_now)
-        return mode
- 
+            first_half = self._in_first_half(self.i)
+
+            if self.half_order == "on_first":
+                return "video" if first_half else "off"
+            else: 
+                return "off" if first_half else "video"
+
+        return {
+            "on": "video",
+            "off": "off"
+        }.get(self.video_setting, "off")
+
     def _in_first_half(self, i):
         return i < (len(self.pool) + 1) // 2
 

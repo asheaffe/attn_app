@@ -2,20 +2,69 @@
 import requests
 import json
 
+from datasets import load_dataset
+
+
+# uses AQuA which is based on GRE questions https://arxiv.org/abs/1705.04146
+DATASET = load_dataset("deepmind/aqua_rat", "raw")
 
 BASE_URL = "https://pinesat.duckdns.org/api/questions"
 
 DIFFICULTY_MAP = {
     "easy": "easy",
-    "medium": "intermediate",
-    "intermediate": "intermediate",
-    "hard": "hard"
+    "medium": "easy",
+    "intermediate": "medium",
+    "hard": "intermediate"
 }
 
 ANSWER_MAP = {"A": 0, "B": 1, "C": 2, "D": 3}
 
 LETTERS = "ABCD"
 
+def huggingface_dataset(row):
+    """
+    Pulls data from multiple different games from https://huggingface.co/datasets/deepmind/aqua_rat
+    and returns it in the desired format
+
+    :param row: a single row of the DATASET
+    :return: dict formatted data for questions
+    """
+    # we don't really care about train/test splits for our purposes so just pulling from the largest section
+    #train_data = DATASET['train']
+    
+    #return json.dumps(train_data)
+    #print(train_data["options"])
+
+    choices = {}
+    for op in row["options"]:
+        try:
+            letter, answer = op.split(")", 1)
+            choices[letter] = answer
+
+        except ValueError as e:
+            print(f"Error: {e}\tOutput: {op}")
+
+    return {
+        "id": 0,
+        "section": "AQuA",
+        "domain": "GRE",
+        
+        # AQuA questions don't have visuals
+        "visuals": {
+            "type": "null",
+            "svg_content": "null"
+        },
+
+        "question": {
+            "choices": choices,
+            "question": row["question"],
+            "paragraph": "null",
+            "explanation": row["rationale"],
+            "correct_answer": row["correct"]
+        },
+
+        "difficulty": "hard"
+    }
 
 def make_question_req(section="english", limit=10, domain=None):
     """
@@ -125,9 +174,21 @@ def load_questions(question_total = 100):
     return questions
 
 def main():
-    q = load_questions()
+    q = list(load_questions())
     
-    with open("data-files/opensat_questions.json", "w", encoding="utf-8") as f:
+    # with open("data-files/opensat_questions.json", "w", encoding="utf-8") as f:
+    #     json.dump(list(q), f, indent=2, ensure_ascii=False)
+
+    # we don't really care about train/test splits for our purposes so just pulling from the largest section
+    data = DATASET['train'].shuffle(seed=42)
+
+    # select 30 random questions
+    selected = data.select(range(100))
+
+    for row in selected:
+        q.append(huggingface_dataset(row))
+
+    with open("data-files/alldata_questions.json", "w", encoding="utf-8") as f:
         json.dump(q, f, indent=2, ensure_ascii=False)
 
 
